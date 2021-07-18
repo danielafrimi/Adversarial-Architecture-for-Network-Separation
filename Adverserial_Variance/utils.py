@@ -9,7 +9,6 @@ from datasetMaker import DatasetMaker, get_class_i
 
 
 def extract_images_to_dataset():
-
     # Transformations
     RC = transforms.RandomCrop(32, padding=4)
     RHF = transforms.RandomHorizontalFlip()
@@ -56,6 +55,13 @@ def visualize_dataset(trainsetLoader):
     imshow(sample_train_images, title=None)
 
 
+def imshow_img(img):
+    img = img / 2 + 0.5  # unnormalize
+    npimg = img.numpy()
+    plt.imshow(np.transpose(npimg, (1, 2, 0)))
+    plt.show()
+
+
 def imshow(inp, title=None):
     """Imshow for Tensor."""
     inp = inp.numpy().transpose((1, 2, 0))
@@ -85,7 +91,7 @@ def visualize_model(model, dataloaders, class_names, num_images=6, device='cpu')
 
             for j in range(inputs.size()[0]):
                 images_so_far += 1
-                ax = plt.subplot(num_images//2, 2, images_so_far)
+                ax = plt.subplot(num_images // 2, 2, images_so_far)
                 ax.axis('off')
                 ax.set_title('predicted: {}'.format(class_names[preds[j]]))
                 imshow(inputs.cpu().data[j])
@@ -94,4 +100,3 @@ def visualize_model(model, dataloaders, class_names, num_images=6, device='cpu')
                     model.train(mode=was_training)
                     return
         model.train(mode=was_training)
-

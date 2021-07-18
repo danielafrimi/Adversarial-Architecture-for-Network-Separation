@@ -10,37 +10,22 @@ from torchvision import datasets, transforms
 from torchvision.models.resnet import resnet18, resnet34, resnet152
 from utils import visualize_model
 import wandb
-from models.CustomResnet import CustomResnet
+from models.customResnet import CustomResnet
 from train import Trainer
 from torch.utils.data import DataLoader
-from utils import get_dataset, imshow
+from utils import imshow
+from models.classifier import Net
 
 print(torch.__version__)
 plt.ion()  # interactive mode
 
 
-def create_model(config, device):
-    # todo !!
-    resnet_model = CustomResnet()
-    resnet_model.load_state_dict(resnet18(pretrained=False).state_dict())
+def create_classifier_model(lr):
 
-    # # Parameters of newly constructed modules have requires_grad=True by default
-    # for param in resnet_model.parameters():
-    #     param.requires_grad = False
-
-    # Change the prediction for 2 classes
-    num_ftrs = resnet_model.fc.in_features
-    resnet_model.fc = nn.Linear(num_ftrs, config.num_classes)
-
-    resnet_model = resnet_model.to(device)
-
+    net = Net()
     criterion = nn.CrossEntropyLoss()
-    optimizer_conv = optim.SGD(resnet_model.parameters(), lr=config.learning_rate_classifier1, momentum=0.9)
-
-    # Decay LR by a factor of 0.1 every 7 epochs
-    exp_lr_scheduler = lr_scheduler.StepLR(optimizer_conv, step_size=7, gamma=0.1)
-
-    return resnet_model, criterion, optimizer_conv, exp_lr_scheduler
+    optimizer = optim.SGD(net.parameters(), lr=lr, momentum=0.9)
+    return net, criterion, optimizer
 
 
 def model_pipeline(hyperparameters):
@@ -49,95 +34,50 @@ def model_pipeline(hyperparameters):
         # access all HPs through wandb.config, so logging matches execution!
         config = wandb.config
 
-        # Data augmentation and normalization for training
-        # Just normalization for validation
-        data_transforms = {
-            'train': transforms.Compose([
-                transforms.RandomRotation(5),
-                transforms.RandomHorizontalFlip(),
-                transforms.RandomResizedCrop(224, scale=(0.96, 1.0), ratio=(0.95, 1.05)),
-                transforms.ToTensor(),
-                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-            ]),
-            'val': transforms.Compose([
-                transforms.Resize([224, 224]),
-                transforms.ToTensor(),
-                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-            ]),
-        }
+        transform = transforms.Compose(
+            [transforms.ToTensor(),
+             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
-        data_dir = 'data'
-        CHECK_POINT_PATH = 'checkpoint.tar'
-        image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x), data_transforms[x])
-                          for x in ['train', 'val']}
+        trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
+                                                download=True, transform=transform)
+        trainloader = torch.utils.data.DataLoader(trainset, batch_size=config.batch_size,
+                                                  shuffle=True)
 
-        dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=32, shuffle=True)
-                       for x in ['train', 'val']}
+        testset = torchvision.datasets.CIFAR10(root='./data', train=False,
+                                               download=True, transform=transform)
+        testloader = torch.utils.data.DataLoader(testset, batch_size=config.batch_size,
+                                                 shuffle=False)
 
-        cat_dog_trainset, cat_dog_testset = get_dataset()
+        classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
-        # Create datasetLoaders from trainset and testset
-        trainsetLoader = DataLoader(cat_dog_trainset, batch_size=16, shuffle=True)
-        testsetLoader = DataLoader(cat_dog_testset, batch_size=16, shuffle=False)
+        classifier1, criterion1, optimizer1 = create_classifier_model(lr=config.learning_rate_classifier1)
+        classifier2, criterion2, optimizer2 = create_classifier_model(lr=config.learning_rate_classifier2)
 
+        trainer = Trainer(trainloader, testloader, [classifier1, classifier2])
+        trainer.train_model([criterion1, criterion2], [optimizer1, optimizer2], num_epochs=config.epochs, checkpoint=None)
+        trainer.validation()
 
-        # print(len(cat_dog_testset), len(cat_dog_testset))
-        dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val']}
-        class_names = image_datasets['train'].classes
+        # prepare to count predictions for each class
+        correct_pred = {classname: 0 for classname in classes}
+        total_pred = {classname: 0 for classname in classes}
 
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-        # todo !!
-        resnet_model = CustomResnet()
-        resnet_model.load_state_dict(resnet18(pretrained=False).state_dict())
-
-        # # Parameters of newly constructed modules have requires_grad=True by default
-        # for param in resnet_model.parameters():
-        #     param.requires_grad = False
-
-        # Change the prediction for 2 classes
-        num_ftrs = resnet_model.fc.in_features
-        resnet_model.fc = nn.Linear(num_ftrs, config.num_classes)
-
-        resnet_model = resnet_model.to(device)
-
-        criterion = nn.CrossEntropyLoss()
-
-        # TODO Observe that only parameters of final layer are being optimized as opposed to before.
-        optimizer_conv = optim.SGD(resnet_model.parameters(), lr=config.learning_rate_classifier1, momentum=0.9)
-
-        # Decay LR by a factor of 0.1 every 7 epochs
-        exp_lr_scheduler = lr_scheduler.StepLR(optimizer_conv, step_size=6, gamma=0.1)
-
-        try:
-            checkpoint = torch.load(CHECK_POINT_PATH)
-            print("checkpoint loaded")
-        except:
-            checkpoint = None
-            print("checkpoint not found")
-
-        _dataloaders = {'train': trainsetLoader, "val":testsetLoader}
-
-        trainer = Trainer(_dataloaders, model=resnet_model, dataset_sizes=dataset_sizes)
-        model_conv, best_val_loss, best_val_acc = trainer.train_model(criterion, optimizer_conv, exp_lr_scheduler,
-                                                                      num_epochs=config.epochs,
-                                                                      checkpoint=None)
-
-        torch.save({'model_state_dict': model_conv.state_dict(),
-                    'optimizer_state_dict': optimizer_conv.state_dict(),
-                    'best_val_loss': best_val_loss,
-                    'best_val_accuracy': best_val_acc,
-                    'scheduler_state_dict': exp_lr_scheduler.state_dict(),
-                    }, CHECK_POINT_PATH)
-
-        print(class_names)
-        print(f'Train image size: {dataset_sizes["train"]}')
-        print(f'Validation image size: {dataset_sizes["val"]}')
-
-        visualize_model(model_conv, dataloaders, class_names)
-
-        plt.ioff()
-        plt.show()
+        # # again no gradients needed
+        # with torch.no_grad():
+        #     for data in testloader:
+        #         images, labels = data
+        #         outputs = net(images)
+        #         _, predictions = torch.max(outputs, 1)
+        #         # collect the correct predictions for each class
+        #         for label, prediction in zip(labels, predictions):
+        #             if label == prediction:
+        #                 correct_pred[classes[label]] += 1
+        #             total_pred[classes[label]] += 1
+        #
+        # # print accuracy for each class
+        # for classname, correct_count in correct_pred.items():
+        #     accuracy = 100 * float(correct_count) / total_pred[classname]
+        #     print("Accuracy for class {:5s} is: {:.1f} %".format(classname,
+        #                                                          accuracy))
 
 
 def main():
@@ -146,8 +86,8 @@ def main():
 
     config = dict(
         epochs=5,
-        batch_size=32,
-        learning_rate_classifier1=0.0001,
+        batch_size=4,
+        learning_rate_classifier1=0.001,
         learning_rate_classifier2=0.01,
         dataset="cats_dogs_cifar10",
         num_classes=2,
