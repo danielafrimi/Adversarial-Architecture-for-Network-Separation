@@ -5,8 +5,19 @@ The discriminator is made up of strided convolution layers, batch norm layers, a
 """
 import torch.nn as nn
 
+
+# custom weights initialization called on netG and netD
+def weights_init(m):
+    classname = m.__class__.__name__
+    if classname.find('Conv') != -1:
+        nn.init.normal_(m.weight.data, 0.0, 0.02)
+    elif classname.find('BatchNorm') != -1:
+        nn.init.normal_(m.weight.data, 1.0, 0.02)
+        nn.init.constant_(m.bias.data, 0)
+
+
 class Discriminator(nn.Module):
-    def __init__(self, ngpu, nc, ndf):
+    def __init__(self, ngpu=0, nc=3, ndf=64):
         """
         :param ngpu: number of GPUs available. If this is 0, code will run in CPU mode.
          If this number is greater than 0 it will run on that number of GPUs
@@ -16,7 +27,7 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
         self.ngpu = ngpu
         self.main = nn.Sequential(
-            # input is (nc) x 224 x 224
+            # input is (nc) x 64 x 64
             nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf) x 32 x 32
@@ -35,6 +46,8 @@ class Discriminator(nn.Module):
             nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
             nn.Sigmoid()
         )
+
+        self.apply(weights_init)
 
     def forward(self, input):
         return self.main(input)

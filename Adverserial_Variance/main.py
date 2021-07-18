@@ -15,13 +15,13 @@ from train import Trainer
 from torch.utils.data import DataLoader
 from utils import imshow
 from models.classifier import Net
+from models.disciminator import Discriminator
 
 print(torch.__version__)
 plt.ion()  # interactive mode
 
 
 def create_classifier_model(lr):
-
     net = Net()
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.SGD(net.parameters(), lr=lr, momentum=0.9)
@@ -39,13 +39,13 @@ def model_pipeline(hyperparameters):
              transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
         trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
-                                                download=True, transform=transform)
+                                                download=False, transform=transform)
         trainloader = torch.utils.data.DataLoader(trainset, batch_size=config.batch_size,
                                                   shuffle=True)
 
         testset = torchvision.datasets.CIFAR10(root='./data', train=False,
-                                               download=True, transform=transform)
-        testloader = torch.utils.data.DataLoader(testset, batch_size=config.batch_size,
+                                               download=False, transform=transform)
+        testloader = torch.utils.data.DataLoader(testset, batch_size=1,
                                                  shuffle=False)
 
         classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
@@ -53,7 +53,9 @@ def model_pipeline(hyperparameters):
         classifier1, criterion1, optimizer1 = create_classifier_model(lr=config.learning_rate_classifier1)
         classifier2, criterion2, optimizer2 = create_classifier_model(lr=config.learning_rate_classifier2)
 
-        trainer = Trainer(trainloader, testloader, [classifier1, classifier2])
+        discrimnator = Discriminator()
+
+        trainer = Trainer(trainloader, testloader, [classifier1, classifier2], discrimnator)
         trainer.train_model([criterion1, criterion2], [optimizer1, optimizer2], num_epochs=config.epochs, checkpoint=None)
         trainer.validation()
 
@@ -85,11 +87,11 @@ def main():
     wandb.login()
 
     config = dict(
-        epochs=5,
+        epochs=4,
         batch_size=4,
         learning_rate_classifier1=0.001,
-        learning_rate_classifier2=0.01,
-        dataset="cats_dogs_cifar10",
+        learning_rate_classifier2=0.001,
+        dataset="cifar10",
         num_classes=2,
         load=True,
         CUDA=True)
