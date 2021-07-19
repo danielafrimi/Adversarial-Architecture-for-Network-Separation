@@ -1,31 +1,36 @@
-import os
-
 import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision
-from torch.optim import lr_scheduler
-from torchvision import datasets, transforms
-from torchvision.models.resnet import resnet18, resnet34, resnet152
-from utils import visualize_model
 import wandb
-from models.customResnet import CustomResnet
-from train import Trainer
 from torch.utils.data import DataLoader
-from utils import imshow
+from torchvision import transforms
+
 from models.classifier import Net
 from models.disciminator import Discriminator
+from models.resnet import ResNet18
+from train import Trainer
 
 print(torch.__version__)
 plt.ion()  # interactive mode
 
 
-def create_classifier_model(lr):
-    net = Net()
+def create_classifier_model(lr, model='basic'):
+    if model == 'resnet':
+        net = ResNet18()
+    else:
+        net = Net()
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(net.parameters(), lr=lr, momentum=0.9)
+    optimizer = optim.Adam(net.parameters(), weight_decay=0.0001, lr=lr)
     return net, criterion, optimizer
+
+
+def create_discriminator():
+    discriminator = Discriminator()
+    optimizerD = optim.Adam(discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
+    criterionD = nn.BCELoss()
+    return discriminator, optimizerD, criterionD
 
 
 def model_pipeline(hyperparameters):
@@ -50,36 +55,21 @@ def model_pipeline(hyperparameters):
 
         classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
-        classifier1, criterion1, optimizer1 = create_classifier_model(lr=config.learning_rate_classifier1)
-        classifier2, criterion2, optimizer2 = create_classifier_model(lr=config.learning_rate_classifier2)
+        classifier1, criterion1, optimizer1 = create_classifier_model(lr=config.learning_rate_classifier1,
+                                                                      )
+        classifier2, criterion2, optimizer2 = create_classifier_model(lr=config.learning_rate_classifier2,
+                                                                      )
 
-        discrimnator = Discriminator()
+        discriminator, optimizerD, criterionD = create_discriminator()
 
-        trainer = Trainer(trainloader, testloader, [classifier1, classifier2], discrimnator)
-        trainer.train_model([criterion1, criterion2], [optimizer1, optimizer2], num_epochs=config.epochs, checkpoint=None)
+        trainer = Trainer(trainloader, testloader, [classifier1, classifier2], discriminator)
+        trainer.train_model([criterion1, criterion2], [optimizer1, optimizer2], optimizerD, criterionD, num_epochs=config.epochs,
+                            checkpoint=None)
         trainer.validation()
 
         # prepare to count predictions for each class
         correct_pred = {classname: 0 for classname in classes}
         total_pred = {classname: 0 for classname in classes}
-
-        # # again no gradients needed
-        # with torch.no_grad():
-        #     for data in testloader:
-        #         images, labels = data
-        #         outputs = net(images)
-        #         _, predictions = torch.max(outputs, 1)
-        #         # collect the correct predictions for each class
-        #         for label, prediction in zip(labels, predictions):
-        #             if label == prediction:
-        #                 correct_pred[classes[label]] += 1
-        #             total_pred[classes[label]] += 1
-        #
-        # # print accuracy for each class
-        # for classname, correct_count in correct_pred.items():
-        #     accuracy = 100 * float(correct_count) / total_pred[classname]
-        #     print("Accuracy for class {:5s} is: {:.1f} %".format(classname,
-        #                                                          accuracy))
 
 
 def main():
@@ -87,10 +77,10 @@ def main():
     wandb.login()
 
     config = dict(
-        epochs=4,
-        batch_size=4,
-        learning_rate_classifier1=0.001,
-        learning_rate_classifier2=0.001,
+        epochs=2,
+        batch_size=32,
+        learning_rate_classifier1=0.01,
+        learning_rate_classifier2=0.01,
         dataset="cifar10",
         num_classes=2,
         load=True,

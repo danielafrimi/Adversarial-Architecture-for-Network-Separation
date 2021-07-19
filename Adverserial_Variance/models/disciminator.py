@@ -5,9 +5,9 @@ The discriminator is made up of strided convolution layers, batch norm layers, a
 """
 import torch.nn as nn
 
-
+# todo  both are Adam optimizers with learning rate 0.0002 and Beta1 = 0.5.
 # custom weights initialization called on netG and netD
-def weights_init(m):
+def init_weights(m):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
         nn.init.normal_(m.weight.data, 0.0, 0.02)
@@ -47,7 +47,7 @@ class Discriminator(nn.Module):
             nn.Sigmoid()
         )
 
-        self.apply(weights_init)
+        self.apply(init_weights)
 
     def forward(self, input):
         return self.main(input)
