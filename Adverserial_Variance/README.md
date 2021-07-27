@@ -54,3 +54,40 @@ Take home messages:
 - Composition of data augmentations is important.
 - Adding a nonlinear transformation between the representation and the contrastive loss helps.
 - Contrastive learning benefits from larger batch sizes and more training steps compared to supervised learning.
+
+#### Siamese Neural Networks for One-shot Image Recognition (2015)
+
+- Ting Chen, Simon Kornblith, Mohammad Norouzi, Geoffrey Hinton.
+  Google Research, Brain Team.
+- Accepted to ICML.
+- [paper](https://www.cs.cmu.edu/~rsalakhu/papers/oneshot1.pdf)
+- [code](https://github.com/fangpin/siamese-pytorch)
+
+Siamese network uses a supervised training approach to learn generic input features then, based on the training data, it makes predictions about unknown class distributions.
+
+1. Siamese network takes two different inputs passed through two similar subnetworks with the same architecture, parameters, and weights.
+2. The two subnetworks are a mirror image of each other, just like the Siamese twins. Hence, any change to any subnetworks architecture, parameter, or weights is also applied to the other subnetwork.
+3. The Siamese network's objective is to classify if the two inputs are the same or different using the Similarity score. 
+  The Similarity score can be calculated using Binary cross-entropy, Contrastive function, or Triplet loss, which are techniques for the general distance metric learning approach.
+  
+
+<p align="center">
+<img src="images/siam_arc.jpeg" alt="Siamese Architecture" width="70%"/>
+</p>
+
+
+#### Let’s Agree to Agree: Neural Networks Share Classification Order on Real Datasets (2020)
+
+- Guy Hacohen, Leshem Choshen, Daphna Weinshall 
+  School of Computer Science and Engineering, The Hebrew University of Jerusalem.
+- Accepted to ICML.
+- [paper](https://arxiv.org/pdf/1905.10854.pdf)
+
+Deep Neural Networks learn the examples in both the training and test sets in a similar order.
+models of different architectures start by learning the same examples,
+after which the more powerful model may continue to learn additional examples.
+
+1. Direct way to compare between different neural models termed TP-agreement (accuracy per image).
+2. Models that share the same architecture learn real datasets in the same order
+3. Stronger architectures start off by learning the same examples that weaker networks learn, then move on to learning new examples.
+
