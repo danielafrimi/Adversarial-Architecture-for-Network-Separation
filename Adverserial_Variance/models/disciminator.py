@@ -5,8 +5,58 @@ The discriminator is made up of strided convolution layers, batch norm layers, a
 """
 import torch.nn as nn
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+class SiameseDiscriminator(nn.Module):
+
+    def __init__(self):
+        super(SiameseDiscriminator, self).__init__()
+        print("hg")
+        self.conv = nn.Sequential(
+            nn.Conv2d(3, 64, 10),  # 64@96*96
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(2),  # 64@48*48
+            nn.Conv2d(64, 128, 7),
+            nn.ReLU(),  # 128@42*42
+            nn.MaxPool2d(2),  # 128@21*21
+            nn.Conv2d(128, 128, 4),
+            nn.ReLU(),  # 128@18*18
+            nn.MaxPool2d(2),  # 128@9*9
+            nn.Conv2d(128, 256, 4),
+            nn.ReLU(),  # 256@6*6
+        )
+        self.liner = nn.Sequential(nn.Linear(9216, 4096), nn.Sigmoid())
+        self.out = nn.Linear(4096, 1)
+
+        self.apply(init_weights)
+
+    def forward_one(self, x):
+        x = self.conv(x)
+        x = x.view(x.size()[0], -1)
+        x = self.liner(x)
+        return x
+
+    def forward(self, x1, x2):
+        """
+
+        :param x1: feature map of classifier1
+        :param x2: feature map of classifier2
+        :return: Score that indicates of similarity (1 is high)
+        """
+        print("hg")
+        out1 = self.forward_one(x1)
+        out2 = self.forward_one(x2)
+        dis = torch.abs(out1 - out2)
+        out = self.out(dis)
+        #  return self.sigmoid(out)
+        return out
+
+
 # todo  both are Adam optimizers with learning rate 0.0002 and Beta1 = 0.5.
-# custom weights initialization called on netG and netD
+# custom weights initialization called on netD
 def init_weights(m):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
