@@ -3,8 +3,9 @@ import wandb
 import matplotlib.pyplot as plt
 
 # Establish convention for real and fake labels during training
-real_label = 1.
-fake_label = 0.
+same_class_label = 1.
+different_class_label = 0.
+
 
 class Trainer:
     def __init__(self, trainloader, testloader, nets, discrimnator, path='./cifar_net.pth'):
@@ -22,6 +23,7 @@ class Trainer:
         # for visualizing the weights updates and log in wandb server
         wandb.watch(self.classifier1, criterion1, log="all", log_freq=5)
         wandb.watch(self.classifier2, criterion2, log="all", log_freq=5)
+        wandb.watch(self.discriminator, criterion2, log="all", log_freq=5)
 
         print('Start Training')
         num_iter = 0
@@ -34,29 +36,44 @@ class Trainer:
             for batch_idx, (images, targets) in enumerate(train_loader_iter):
                 num_iter += 1
 
-                # fetch second batch
-                images_2, targets_2 = next(train_loader_iter)
-                batch_idx += 1
+                # Split the data into 2 batches. one for each model
+                images_1, images_2 = torch.split(images, 8, dim=0)
+                targets_1, targets_2 = torch.split(targets, 8, dim=0)
+
+                # Images of the same class gets the label 1, otherwise the label is 0
+                same_different_class_labels = torch.logical_xor(targets_1, targets_2).type(torch.DoubleTensor)
+                same_different_class_labels = same_different_class_labels < 1
 
                 # zero the parameter gradients
                 optimizer1.zero_grad()
                 optimizer2.zero_grad()
+                optimizerD.zero_grad()
 
                 # forward + backward + optimize
-                outputs1, feature_map_1 = self.classifier1(images)
-                loss_1 = criterion1(outputs1, targets)
-                loss_1.backward()
-                optimizer1.step()
+                outputs1, feature_map_1 = self.classifier1(images_1)
 
                 # forward + backward + optimize
                 outputs2, feature_map_2 = self.classifier2(images_2)
-                loss_2 = criterion2(outputs2, targets_2)
+
+                # Pass the latent code of the images to Discriminator + backward + optimize
+                # same_different_class_output = self.discriminator(feature_map_1, feature_map_2)
+                # loss_discriminator = criterionD(same_different_class_output, same_different_class_labels)
+                # loss_discriminator.backward()
+                # optimizerD.step()
+
+                # Backward + Optimize Classifiers
+                loss_1 = criterion1(outputs1, targets_1)  # todo add here
+                loss_1.backward()
+                optimizer1.step()
+
+                loss_2 = criterion2(outputs2, targets_2)  #todo add here
                 loss_2.backward()
                 optimizer2.step()
 
                 # print statistics
                 running_loss_1 += loss_1.item()
                 running_loss_2 += loss_2.item()
+                # todo add d loss
                 if batch_idx % 5 == 4:  # print every 2000 mini-batches
                     wandb.log({"running loss classifier_1": running_loss_1 / 200, }
                               , step=num_iter)
@@ -71,10 +88,10 @@ class Trainer:
                     running_loss_2 = 0.0
 
                 if batch_idx % 200 == 199:
-                    self.visualize_feature_map(images, outputs1, layer='conv2')
+                    self.validation()
 
-        torch.save(self.classifier1.state_dict(), self.weights_path)
-        torch.save(self.classifier2.state_dict(), self.weights_path)
+        torch.save(self.classifier1.state_dict(), './cifar_net_1.pth')
+        torch.save(self.classifier2.state_dict(), './cifar_net_2.pth')
         return self.classifier1, self.classifier2
 
     def validation(self):
@@ -114,6 +131,7 @@ class Trainer:
         def get_activation(name):
             def hook(model, input, output):
                 activation[name] = output.detach()
+
             return hook
 
         self.classifier1.conv1.register_forward_hook(get_activation(layer))

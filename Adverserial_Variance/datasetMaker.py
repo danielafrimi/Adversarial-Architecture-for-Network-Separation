@@ -6,7 +6,6 @@ import numpy as np
 
 
 # Define a function to separate CIFAR classes by class index
-
 def get_class_i(x, y, i):
     """
     x: trainset.train_data or testset.test_data

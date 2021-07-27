@@ -8,7 +8,7 @@ from torchvision.datasets import CIFAR10
 from datasetMaker import DatasetMaker, get_class_i
 
 
-def extract_images_to_dataset():
+def extract_images_to_dataset(class_1='cat', class_2='dog'):
     # Transformations
     RC = transforms.RandomCrop(32, padding=4)
     RHF = transforms.RandomHorizontalFlip()
@@ -22,9 +22,9 @@ def extract_images_to_dataset():
     # Transforms object for testset with NO augmentation
     transform_no_aug = transforms.Compose([TT, NRM])
 
-    # Downloading/Louding CIFAR10 data
-    trainset = CIFAR10(root='./data', train=True, download=True)  # , transform = transform_with_aug)
-    testset = CIFAR10(root='./data', train=False, download=True)  # , transform = transform_no_aug)
+    # Downloading/Loading CIFAR10 data
+    trainset = CIFAR10(root='./data', train=True, download=True)
+    testset = CIFAR10(root='./data', train=False, download=True)
     classDict = {'plane': 0, 'car': 1, 'bird': 2, 'cat': 3, 'deer': 4, 'dog': 5, 'frog': 6, 'horse': 7, 'ship': 8,
                  'truck': 9}
 
@@ -35,12 +35,12 @@ def extract_images_to_dataset():
     y_test = testset.targets
 
     # Let's choose cats (class 3 of CIFAR) and dogs (class 5 of CIFAR) as trainset/testset
-    cat_dog_trainset = DatasetMaker([get_class_i(x_train, y_train, classDict['cat']),
-                                     get_class_i(x_train, y_train, classDict['dog'])],
+    cat_dog_trainset = DatasetMaker([get_class_i(x_train, y_train, classDict[class_1]),
+                                     get_class_i(x_train, y_train, classDict[class_2])],
                                     transform_with_aug)
 
-    cat_dog_testset = DatasetMaker([get_class_i(x_test, y_test, classDict['cat']),
-                                    get_class_i(x_test, y_test, classDict['dog'])],
+    cat_dog_testset = DatasetMaker([get_class_i(x_test, y_test, classDict[class_1]),
+                                    get_class_i(x_test, y_test, classDict[class_2])],
                                    transform_no_aug)
 
     return cat_dog_trainset, cat_dog_testset
