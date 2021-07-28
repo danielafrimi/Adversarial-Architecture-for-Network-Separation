@@ -21,7 +21,16 @@
   - [Representation Learning](#representation-learning)
     - [SimCLR - A Simple Framework for Contrastive Learning of Visual Representations (Feb 2020)](#simclr---a-simple-framework-for-contrastive-learning-of-visual-representations-feb-2020)
     - [SimCLRv2 - Big Self-Supervised Models are Strong Semi-Supervised Learners (Jun 2020)](#simclrv2---big-self-supervised-models-are-strong-semi-supervised-learners-jun-2020)
-    
+
+
+### Experiments
+1. train a simple net (3 blocks like resnet), on cifar10 with accuracy of 86%. 
+after this, I trained the model only on 2 classes from the dataset (cat, dog - 5000 images per class), with accuracy of ~80%.
+
+2. Used SiameseNet for Discriminator, takes two representations of a batch (tensors) and return similarity score. SiameseNet contains layers of Max Polling.
+   According to the DCGAN paper, it is not recommended using these layers while training a GAN, and replace the down/up sampling with stride conv layers.
+   # todo - change the architecture
+
 
 ### Related Papers & Subjects
 
