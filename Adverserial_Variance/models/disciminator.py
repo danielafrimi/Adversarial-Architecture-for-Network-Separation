@@ -14,7 +14,7 @@ class SiameseDiscriminator(nn.Module):
 
     def __init__(self):
         super(SiameseDiscriminator, self).__init__()
-        print("hg")
+        # TODO replace pooling layer with stride conv
         self.conv = nn.Sequential(
             nn.Conv2d(3, 64, 10),  # 64@96*96
             nn.ReLU(inplace=True),
@@ -46,7 +46,7 @@ class SiameseDiscriminator(nn.Module):
         :param x2: feature map of classifier2
         :return: Score that indicates of similarity (1 is high)
         """
-        print("hg")
+        print(x1.shape)
         out1 = self.forward_one(x1)
         out2 = self.forward_one(x2)
         dis = torch.abs(out1 - out2)

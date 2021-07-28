@@ -8,23 +8,29 @@ from torchvision.datasets import CIFAR10
 from datasetMaker import DatasetMaker, get_class_i
 
 
-def extract_images_to_dataset(class_1='cat', class_2='dog'):
-    # Transformations
+def get_image_transforms():
     RC = transforms.RandomCrop(32, padding=4)
     RHF = transforms.RandomHorizontalFlip()
-    RVF = transforms.RandomVerticalFlip()
     NRM = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
     TT = transforms.ToTensor()
     TPIL = transforms.ToPILImage()
 
     # Transforms object for trainset with augmentation
-    transform_with_aug = transforms.Compose([TPIL, RC, RHF, TT, NRM])
+    transform_with_aug = transforms.Compose([TPIL,RC, RHF, TT, NRM])
     # Transforms object for testset with NO augmentation
     transform_no_aug = transforms.Compose([TT, NRM])
 
+    return transform_with_aug, transform_no_aug
+
+
+def extract_images_to_dataset(class_1='cat', class_2='dog'):
+    # Transforms object for trainset with augmentation
+    transform_with_aug, transform_no_aug = get_image_transforms()
+
     # Downloading/Loading CIFAR10 data
-    trainset = CIFAR10(root='./data', train=True, download=True)
-    testset = CIFAR10(root='./data', train=False, download=True)
+    trainset = CIFAR10(root='./data', train=True, download=False)
+    testset = CIFAR10(root='./data', train=False, download=False)
+
     classDict = {'plane': 0, 'car': 1, 'bird': 2, 'cat': 3, 'deer': 4, 'dog': 5, 'frog': 6, 'horse': 7, 'ship': 8,
                  'truck': 9}
 
@@ -44,6 +50,21 @@ def extract_images_to_dataset(class_1='cat', class_2='dog'):
                                    transform_no_aug)
 
     return cat_dog_trainset, cat_dog_testset
+
+
+def get_trainloader_all_cifar10():
+    # todo this is on the whole dataset
+    transform_with_aug, transform_no_aug = get_image_transforms()
+    trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
+                                            download=False, transform=transform_with_aug)
+
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=64, shuffle=True)
+
+    testset = torchvision.datasets.CIFAR10(root='./data', train=False,
+                                           download=False, transform=transform_no_aug)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False)
+
+    return trainloader, testloader
 
 
 def visualize_dataset(trainsetLoader):
@@ -75,14 +96,13 @@ def imshow(inp, title=None):
     plt.pause(0.001)  # pause a bit so that plots are updated
 
 
-def visualize_model(model, dataloaders, class_names, num_images=6, device='cpu'):
-    was_training = model.training
+def visualize_model(model, dataloader, class_names, num_images=4, device='cpu'):
     model.eval()
     images_so_far = 0
     fig = plt.figure()
 
     with torch.no_grad():
-        for i, (inputs, labels) in enumerate(dataloaders['val']):
+        for i, (inputs, labels) in enumerate(dataloader):
             inputs = inputs.to(device)
             labels = labels.to(device)
 
@@ -94,9 +114,5 @@ def visualize_model(model, dataloaders, class_names, num_images=6, device='cpu')
                 ax = plt.subplot(num_images // 2, 2, images_so_far)
                 ax.axis('off')
                 ax.set_title('predicted: {}'.format(class_names[preds[j]]))
-                imshow(inputs.cpu().data[j])
-
-                if images_so_far == num_images:
-                    model.train(mode=was_training)
-                    return
-        model.train(mode=was_training)
+            imshow(inputs.cpu().data[j])
+            break

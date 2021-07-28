@@ -8,10 +8,10 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 
 from models.classifier import Net
-from models.disciminator import Discriminator, SiameseDiscriminator
+from models.disciminator import SiameseDiscriminator
 from models.resnet import ResNet18
 from train import Trainer
-from utils import extract_images_to_dataset
+from utils import extract_images_to_dataset, get_trainloader_all_cifar10
 
 print(torch.__version__)
 plt.ion()  # interactive mode
@@ -24,8 +24,9 @@ def create_classifier_model(lr, num_classes, model='basic'):
         net = Net()
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(net.parameters(), weight_decay=0.0001, lr=lr)
-    return net, criterion, optimizer
+    optimizer = optim.SGD(net.parameters(), lr=lr, momentum=0.9, weight_decay=5e-4)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
+    return net, criterion, optimizer, scheduler
 
 
 def create_discriminator():
@@ -61,38 +62,25 @@ def model_pipeline(hyperparameters):
         cat_dog_trainset, cat_dog_testset = extract_images_to_dataset()
 
         # Create datasetLoaders from trainset and testset
-        trainsetLoader = DataLoader(cat_dog_trainset, batch_size=16, shuffle=True)
-        testsetLoader = DataLoader(cat_dog_testset, batch_size=16, shuffle=False)
+        trainsetLoader = DataLoader(cat_dog_trainset, batch_size=config.batch_size, shuffle=True)
+        testsetLoader = DataLoader(cat_dog_testset, batch_size=config.batch_size, shuffle=False)
 
-        # todo this is on the whole dataset
-        # trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
-        #                                         download=False, transform=transform['train'])
-        # trainloader = torch.utils.data.DataLoader(trainset, batch_size=config.batch_size,
-        #                                           shuffle=True)
-        #
-        # testset = torchvision.datasets.CIFAR10(root='./data', train=False,
-        #                                        download=False, transform=transform['test'])
-        # testloader = torch.utils.data.DataLoader(testset, batch_size=1,
-        #                                          shuffle=False)
+        trainsetLoader, testsetLoader = get_trainloader_all_cifar10()
 
-        classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
-
-        classifier1, criterion1, optimizer1 = create_classifier_model(lr=config.learning_rate_classifier1,
-                                                                      num_classes=config.num_classes, model='resnet')
-        classifier2, criterion2, optimizer2 = create_classifier_model(lr=config.learning_rate_classifier2,
-                                                                      num_classes=config.num_classes, model='resnet')
+        classifier1, criterion1, optimizer1, scheduler1 = create_classifier_model(lr=config.learning_rate_classifier1,
+                                                                                  num_classes=config.num_classes,
+                                                                                  model='resnet')
+        classifier2, criterion2, optimizer2, scheduler2 = create_classifier_model(lr=config.learning_rate_classifier2,
+                                                                                  num_classes=config.num_classes,
+                                                                                  model='resnet')
 
         discriminator, optimizerD, criterionD = create_discriminator()
 
         trainer = Trainer(trainsetLoader, testsetLoader, [classifier1, classifier2], discriminator)
-        trainer.train_model([criterion1, criterion2], [optimizer1, optimizer2], optimizerD, criterionD, num_epochs=config.epochs,
-                            checkpoint=None)
+        trainer.train_model([criterion1, criterion2], [optimizer1, optimizer2], [scheduler1, scheduler2], optimizerD,
+                            criterionD, num_epochs=config.epochs, checkpoint=None)
 
         trainer.validation()
-
-        # prepare to count predictions for each class
-        correct_pred = {classname: 0 for classname in classes}
-        total_pred = {classname: 0 for classname in classes}
 
 
 def main():
@@ -100,14 +88,12 @@ def main():
     wandb.login()
 
     config = dict(
-        epochs=1,
-        batch_size=32,
+        epochs=20,
+        batch_size=64,
         learning_rate_classifier1=0.01,
         learning_rate_classifier2=0.01,
         dataset="cifar10",
-        num_classes=2,
-        load=True,
-        CUDA=True)
+        num_classes=2)
 
     model_pipeline(config)
 
