@@ -17,9 +17,11 @@ same_class_label = 1.
 different_class_label = 0.
 
 hyperparameters = dict(
-    epochs=20,
-    batch_size=64,
-    learning_rate_classifier1=0.001,
+    epochs=40,
+    batch_size=128,
+    cross_entropy_loss_weight=0.6,
+    disc_loss_weight=0.4,
+    learning_rate_classifier1=0.01,
     learning_rate_classifier2=0.01,
     dataset="cifar10",
     num_classes=2)
@@ -36,7 +38,6 @@ def main():
         # Assuming that we are on a CUDA machine, this should print a CUDA device:
         print(device)
 
-        batch_size = 64
 
         transform_train = transforms.Compose([
             transforms.RandomCrop(32, padding=4),
@@ -53,12 +54,12 @@ def main():
 
         trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
                                                 download=False, transform=transform_train)
-        trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size,
+        trainloader = torch.utils.data.DataLoader(trainset, batch_size=config.batch_size,
                                                   shuffle=True, num_workers=2)
 
         testset = torchvision.datasets.CIFAR10(root='./data', train=False,
                                                download=False, transform=transform_test)
-        testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size,
+        testloader = torch.utils.data.DataLoader(testset, batch_size=config.batch_size,
                                                  shuffle=False, num_workers=2)
 
         classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
@@ -117,12 +118,12 @@ def main():
         discriminator.to(device)
 
         for epoch in range(config.epochs):  # loop over the dataset multiple times
-            num_iter += 1
-
             running_loss = 0.0
             running_loss_2 = 0.0
             running_loss_d = 0.0
             for i, data in enumerate(trainsetLoader, 0):
+                num_iter += 1
+                wandb.log({"i": i, } ,step=num_iter)
                 # Split the data into 2 batches. one batch for each model
                 images_1, images_2 = torch.split(data[0], data[0].shape[0] // 2, dim=0)
                 targets_1, targets_2 = torch.split(data[1], data[1].shape[0] // 2, dim=0)
@@ -130,10 +131,16 @@ def main():
                 images_1, images_2, targets_1, targets_2 = images_1.to(device), images_2.to(device), \
                                                            targets_1.to(device), targets_2.to(device)
 
-                same_different_class_labels_numpy = np.logical_xor(targets_1.cpu().numpy(), targets_2.cpu().numpy())
                 # Images of the same class gets the label 1, otherwise the label is 0
-                same_different_class_labels = torch.logical_xor(targets_1, targets_2).type(torch.float)
-                same_different_class_labels = (same_different_class_labels < 1).to(device)
+                same_different_class_labels_numpy = np.logical_xor(targets_1.cpu().numpy(),
+                                                                   targets_2.cpu().numpy()).astype(int)
+                labels_classifiers = torch.from_numpy(same_different_class_labels_numpy).type(torch.FloatTensor)
+                labels_classifiers = torch.unsqueeze(labels_classifiers, dim=1).to(device)
+                same_different_class_labels_numpy = (same_different_class_labels_numpy < 1)
+                same_different_class_labels_tensor = torch.from_numpy(same_different_class_labels_numpy)
+                same_different_class_labels_tensor = same_different_class_labels_tensor.type(torch.FloatTensor)
+                same_different_class_labels_tensor = torch.unsqueeze(same_different_class_labels_tensor, dim=1).to(
+                    device)
 
                 # zero the parameter gradients
                 optimizer.zero_grad()
@@ -141,28 +148,32 @@ def main():
                 optimizerD.zero_grad()
 
                 # forward + backward + optimize
+                # todo feature map is a tensor of shape torch.Size([32, 4096]), 32 is the batch size
                 outputs, feature_map = net(images_1)
                 outputs2, feature_map2 = net2(images_2)
 
                 same_different_class_output = discriminator(feature_map, feature_map2)
                 loss_discriminator = criterionD(same_different_class_output,
-                                                same_different_class_labels)
+                                                same_different_class_labels_tensor)
 
-                loss_discriminator.backward()
+                loss_discriminator.backward(retain_graph=True)
 
                 # todo create tensors of 1 ?
                 b_size = images_1.size(0)
                 label_classifier_D = torch.full((b_size,), different_class_label, dtype=torch.float, device=device)
+                a = config.cross_entropy_loss_weight * criterion(outputs, targets_1)
+                b =config.disc_loss_weight * criterionD(same_different_class_output, labels_classifiers)
+                loss = a + b
 
-                loss = criterion(outputs, targets_1) + criterionD(label_classifier_D, same_different_class_output)
-                loss2 = criterion2(outputs2, targets_2) + criterionD(label_classifier_D, same_different_class_output)
+                loss2 = config.cross_entropy_loss_weight * criterion2(outputs2, targets_2) + \
+                        config.disc_loss_weight * criterionD(same_different_class_output, labels_classifiers)
 
-                loss.backward()
-                loss2.backward()
+                loss.backward(retain_graph=True)
+                loss2.backward(retain_graph=True)
 
+                optimizerD.step()
                 optimizer.step()
                 optimizer2.step()
-                optimizerD.step()
 
                 # print statistics
                 running_loss += loss.item()
@@ -171,7 +182,11 @@ def main():
 
                 if i % 70 == 69:  # print every 2000 mini-batches
                     print('[%d, %5d] loss: %.3f' % (epoch + 1, i + 1, running_loss / 70))
-                    wandb.log({"running loss classifier_2": running_loss / 70, }
+                    wandb.log({"running loss classifier_1": running_loss / 70, }
+                              , step=num_iter)
+                    wandb.log({"running loss classifier_2": running_loss_2 / 70, }
+                              , step=num_iter)
+                    wandb.log({"running loss d": running_loss_d / 70, }
                               , step=num_iter)
                     logger.info({"running loss classifier_1": running_loss / 70})
                     logger.info({"running loss classifier_2": running_loss_2 / 70})
@@ -181,51 +196,57 @@ def main():
                     running_loss_2 = 0.0
                     running_loss_d = 0.0
 
+            validation(net, net2, testsetLoader, device, classes_binary, classes, num_iter)
+
         print('Finished Training')
 
-        correct = 0
-        total = 0
-        # since we're not training, we don't need to calculate the gradients for our outputs
-        with torch.no_grad():
-            for model in [net, net2]:
-                for data in testsetLoader:
-                    images, labels = data[0].to(device), data[1].to(device)
-                    # calculate outputs by running images through the network
-                    outputs = model(images)
-                    # the class with the highest energy is what we choose as prediction
-                    _, predicted = torch.max(outputs.data, 1)
-                    total += labels.size(0)
-                    correct += (predicted == labels).sum().item()
 
-                print('Accuracy of the network on test images: %d %%' % (100 * correct / total))
+def validation(net, net2, testsetLoader, device, classes_binary, classes, num_iter):
+    correct = 0
+    total = 0
+    # since we're not training, we don't need to calculate the gradients for our outputs
+    with torch.no_grad():
+        for id, model in enumerate([net, net2]):
+            for data in testsetLoader:
+                images, labels = data[0].to(device), data[1].to(device)
+                # calculate outputs by running images through the network
+                outputs, f = model(images)
+                # the class with the highest energy is what we choose as prediction
+                _, predicted = torch.max(outputs.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
 
-        # prepare to count predictions for each class
-        correct_pred = {classname: 0 for classname in classes_binary}
-        total_pred = {classname: 0 for classname in classes}
+            print('Accuracy of the network on test images: %d %%' % (100 * correct / total))
+            wandb.log({"acc {}".format(id): (100 * correct / total), }
+                      , step=num_iter)
 
-        # visualize_model(net, testsetLoader, classes_binary, device=device)
+    # prepare to count predictions for each class
+    correct_pred = {classname: 0 for classname in classes_binary}
+    total_pred = {classname: 0 for classname in classes}
 
-        # again no gradients needed
-        with torch.no_grad():
-            for model in [net, net2]:
-                for data in testsetLoader:
-                    images, labels = data[0].to(device), data[1].to(device)
-                    # cat label is 0 and dog is 1
-                    outputs = model(images)
-                    # imshow_img(torchvision.utils.make_grid(images.cpu()))
-                    _, predictions = torch.max(outputs, 1)
-                    # collect the correct predictions for each class
-                    for label, prediction in zip(labels, predictions):
-                        if label == prediction:
-                            correct_pred[classes_binary[label]] += 1
-                        total_pred[classes_binary[label]] += 1
+    # visualize_model(net, testsetLoader, classes_binary, device=device)
 
-                print(correct_pred.items())
-                # print accuracy for each class
-                for classname, correct_count in correct_pred.items():
-                    accuracy = 100 * float(correct_count) / total_pred[classname]
-                    print("Accuracy for class {:5s} is: {:.1f} %".format(classname,
-                                                                         accuracy))
+    # # again no gradients needed
+    # with torch.no_grad():
+    #     for model in [net, net2]:
+    #         for data in testsetLoader:
+    #             images, labels = data[0].to(device), data[1].to(device)
+    #             # cat label is 0 and dog is 1
+    #             outputs, f = model(images)
+    #             # imshow_img(torchvision.utils.make_grid(images.cpu()))
+    #             _, predictions = torch.max(outputs, 1)
+    #             # collect the correct predictions for each class
+    #             for label, prediction in zip(labels, predictions):
+    #                 if label == prediction:
+    #                     correct_pred[classes_binary[label]] += 1
+    #                 total_pred[classes_binary[label]] += 1
+    #
+    #         print(correct_pred.items())
+    #         # print accuracy for each class
+    #         for classname, correct_count in correct_pred.items():
+    #             accuracy = 100 * float(correct_count) / total_pred[classname]
+    #             print("Accuracy for class {:5s} is: {:.1f} %".format(classname,
+    #                                                                  accuracy))
 
 
 if __name__ == '__main__':
