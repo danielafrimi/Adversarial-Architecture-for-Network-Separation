@@ -12,5 +12,5 @@ module load torch
 source /cs/labs/daphna/daniel023/lab_env/bin/activate
 cd /cs/labs/daphna/daniel023/Adverserial_Variance
 
-python3 main.py
+python3 playground.py
 

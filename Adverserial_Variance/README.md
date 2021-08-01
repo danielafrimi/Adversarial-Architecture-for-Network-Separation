@@ -1,27 +1,5 @@
 # Thesis
 
-# Table of Contents
-
-- [Table of Contents](#table-of-contents)
-- [Introduction](#introduction)
-- [Experiments](#experiments)
-  - [Getting Started](#getting-started)
-    - [Creating The Environment](#creating-the-environment)
-      - [CUDA >= 10.2](#cuda--102)
-      - [CUDA 9](#cuda-9)
-    - [wandb](#wandb)
-    - [Clone The Repo](#clone-the-repo)
-    - [Running The Experiments](#running-the-experiments)
-      - [Prerequisites](#prerequisites)
-      - [Example Command-lines](#example-command-lines)
-  - [1st iteration](#1st-iteration)
-  - [2nd iteration](#2nd-iteration)
-  - [3rd iteration](#3rd-iteration)
-- [Related Work](#related-work)
-  - [Representation Learning](#representation-learning)
-    - [SimCLR - A Simple Framework for Contrastive Learning of Visual Representations (Feb 2020)](#simclr---a-simple-framework-for-contrastive-learning-of-visual-representations-feb-2020)
-    - [SimCLRv2 - Big Self-Supervised Models are Strong Semi-Supervised Learners (Jun 2020)](#simclrv2---big-self-supervised-models-are-strong-semi-supervised-learners-jun-2020)
-
 
 ### Experiments
 1. train a simple net (3 blocks like resnet), on cifar10 with accuracy of 86%. 
@@ -29,7 +7,12 @@ after this, I trained the model only on 2 classes from the dataset (cat, dog - 5
 
 2. Used SiameseNet for Discriminator, takes two representations of a batch (tensors) and return similarity score. SiameseNet contains layers of Max Polling.
    According to the DCGAN paper, it is not recommended using these layers while training a GAN, and replace the down/up sampling with stride conv layers.
-   # todo - change the architecture
+   I have changed the architecture, by removing those layers + changed the conv layers to be stride one (in total 5 layers) + BN.
+   
+3. From the DCGAN paper, the authors specify that all model weights shall be randomly initialized from a Normal distribution with mean=0, stdev=0.02. 
+   The weights_init function takes an initialized model as input and reinitializes all convolutional, convolutional-transpose, 
+   and batch normalization layers to meet this criteria.  
+   
 
 
 ### Related Papers & Subjects
