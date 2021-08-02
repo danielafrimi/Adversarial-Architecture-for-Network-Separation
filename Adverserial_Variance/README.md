@@ -9,11 +9,17 @@ after this, I trained the model only on 2 classes from the dataset (cat, dog - 5
    According to the DCGAN paper, it is not recommended using these layers while training a GAN, and replace the down/up sampling with stride conv layers.
    I have changed the architecture, by removing those layers + changed the conv layers to be stride one (in total 5 layers) + BN.
    
+   ** According to daphna we shpuld not use assumption from GAN's training, because this task is different. therefore, check if the previous architecture network.
 3. From the DCGAN paper, the authors specify that all model weights shall be randomly initialized from a Normal distribution with mean=0, stdev=0.02. 
    The weights_init function takes an initialized model as input and reinitializes all convolutional, convolutional-transpose, 
    and batch normalization layers to meet this criteria.  
    
-
+#### TODO
+1. Implement TPR for each sample (Let's agree to agree).
+2. Take 6 Basic models (without adversarial method) and 3 (pairs) models that training with our method.
+and calculate the TPR for each sample (and checks if the accuracy remains + more diversity).
+3. Get a test set for Discriminator (thought to take a latents codes with its labels, in the end of the classifier train).
+4. play with the weight of each loss. 
 
 ### Related Papers & Subjects
 
