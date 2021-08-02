@@ -1,33 +1,30 @@
 import torch
 import wandb
 import matplotlib.pyplot as plt
-
-# Establish convention for same class labels and different one
-same_class_label = 1.
-different_class_label = 0.
+import torch.nn as nn
 
 
 class Trainer:
-    def __init__(self, trainloader, testloader, nets, discrimnator, path='./cifar_net.pth'):
+    def __init__(self, trainloader, testloader, models, discrimnator):
         self.trainloader = trainloader
         self.testloader = testloader
-        self.classifier1, self.classifier2 = nets[0], nets[1]
-        self.weights_path = path
+        self.classifier1, self.classifier2 = models[0], models[1]
         self.discriminator = discrimnator
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    def train_model(self, criterions_nets, optimizer, schedulers, optimizerD, criterionD, num_epochs=10, checkpoint=None):
+    def train_model(self, optimizers, optimizerD, num_epochs=20):
         if torch.cuda.device_count() > 0:
             print("gpu name", torch.cuda.get_device_name(0))
 
-        criterion1, criterion2 = criterions_nets[0], criterions_nets[1]
-        optimizer1, optimizer2 = optimizer[0], optimizer[1]
-        scheduler1, scheduler2 = schedulers[0], schedulers[1]
-
+        criterionD = nn.BCELoss().to(self.device)
+        criterion_classifiers = nn.CrossEntropyLoss().to(self.device)
+        optimizer1, optimizer2 = optimizers[0], optimizers[1]
+        opt = optimizerD
         # for visualizing the weights updates and log in wandb server
-        for model, criterion in [(self.classifier1, criterion1),
-                      (self.classifier2, criterion2), (self.discriminator, criterionD)]:
+        for model, criterion in [(self.classifier1,criterion_classifiers),
+                      (self.classifier2, criterion_classifiers), (self.discriminator, criterionD)]:
             wandb.watch(model, criterion, log="all", log_freq=5)
+
 
         print('Start Training')
         num_iter = 0
@@ -41,70 +38,8 @@ class Trainer:
 
             for batch_idx, (images, targets) in enumerate(self.trainloader, 0):
                 num_iter += 1
-                print(batch_idx)
-                images, targets = images.to(self.device), targets.to(self.device)
-                # Split the data into 2 batches. one batch for each model
-                images_1, images_2 = torch.split(images, images.shape[0]//2, dim=0)
-                targets_1, targets_2 = torch.split(targets, targets.shape[0]//2, dim=0)
-                # Move to GPU
-                images_1, images_2, targets_1, targets_2 = images_1.to(self.device), images_2.to(self.device), \
-                                                           targets_1.to(self.device), targets_2.to(self.device)
 
-                # Images of the same class gets the label 1, otherwise the label is 0
-                same_different_class_labels = torch.logical_xor(targets_1, targets_2).type(torch.DoubleTensor)
-                same_different_class_labels = same_different_class_labels < 1
 
-                # zero the parameter gradients
-                optimizer1.zero_grad()
-                # optimizer2.zero_grad()
-                # optimizerD.zero_grad()
-
-                # forward + backward + optimize
-                #todo change it back after training
-                outputs1, feature_map_1 = self.classifier1(images)
-
-                # forward + backward + optimize
-                # outputs2, feature_map_2 = self.classifier2(images_2)
-
-                # Pass the latent code of the images to Discriminator + backward + optimize
-                # same_different_class_output = self.discriminator(feature_map_1, feature_map_2)
-                # loss_discriminator = criterionD(same_different_class_output, same_different_class_labels)
-                # loss_discriminator.backward()
-                # optimizerD.step()
-
-                # Backward + Optimize Classifiers
-                # todo change targets
-                loss_1 = criterion1(outputs1, targets)  # todo add here
-                loss_1.backward()
-                optimizer1.step()
-                #
-                # loss_2 = criterion2(outputs2, targets_2)  #todo add here
-                # loss_2.backward()
-                # optimizer2.step()
-
-                # print statistics
-                running_loss_1 += loss_1.item()
-                # running_loss_2 += loss_2.item()
-                # todo add d loss
-                if batch_idx % 5 == 4:  # print every 200 mini-batches
-                    wandb.log({"running loss classifier_1": running_loss_1 / 5, }
-                              , step=num_iter)
-
-                    wandb.log({"running loss classifier_2": running_loss_2 / 5, }
-                              , step=num_iter)
-
-                    print('[%d, %5d] loss_1: %.3f' % (epoch + 1, batch_idx + 1, running_loss_1 / 200))
-                    print('[%d, %5d] loss_2: %.3f' % (epoch + 1, batch_idx + 1, running_loss_2 / 200))
-                    print()
-                    running_loss_1, running_loss_2 = 0.0, 0.0
-
-                if batch_idx % 10 == 9:
-                    nets_accuracy = self.validation()
-                    for i, accuracy in enumerate(nets_accuracy):
-                        wandb.log({"accuracy classifier_{}".format(i): accuracy, }, step=num_iter)
-
-            scheduler1.step()
-            # scheduler2.step()
 
         torch.save(self.classifier1.state_dict(), './cifar_net_1.pth')
         torch.save(self.classifier2.state_dict(), './cifar_net_2.pth')

@@ -1,12 +1,18 @@
+import datetime
+import os
+import sys
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torchvision
 import torchvision.transforms as transforms
+from loguru import logger
+from torch.utils.data import DataLoader
 from torchvision.datasets import CIFAR10
 
 from datasetMaker import DatasetMaker, get_class_i
-
+from consts import LOGGER_FORMAT, DATETIME_STRING_FORMAT
 
 def get_image_transforms():
     RC = transforms.RandomCrop(32, padding=4)
@@ -23,7 +29,7 @@ def get_image_transforms():
     return transform_with_aug, transform_no_aug
 
 
-def extract_images_to_dataset(class_1='cat', class_2='dog'):
+def extract_specific_classes_cifar10(class_1='cat', class_2='dog'):
     # Transforms object for trainset with augmentation
     transform_with_aug, transform_no_aug = get_image_transforms()
 
@@ -51,6 +57,14 @@ def extract_images_to_dataset(class_1='cat', class_2='dog'):
 
     return cat_dog_trainset, cat_dog_testset
 
+def get_trainloader_subclasses_cifar10(config):
+    cat_dog_trainset, cat_dog_testset = extract_specific_classes_cifar10()
+    # Create datasetLoaders from trainset and testset
+    trainsetLoader = DataLoader(cat_dog_trainset, batch_size=config.batch_size, shuffle=True)
+    testsetLoader = DataLoader(cat_dog_testset, batch_size=config.batch_size, shuffle=False)
+    return trainsetLoader, testsetLoader
+
+
 
 def get_trainloader_all_cifar10():
     # todo this is on the whole dataset
@@ -58,11 +72,11 @@ def get_trainloader_all_cifar10():
     trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
                                             download=False, transform=transform_with_aug)
 
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=64, shuffle=True)
+    trainloader = DataLoader(trainset, batch_size=64, shuffle=True)
 
     testset = torchvision.datasets.CIFAR10(root='./data', train=False,
                                            download=False, transform=transform_no_aug)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False)
+    testloader = DataLoader(testset, batch_size=100, shuffle=False)
 
     return trainloader, testloader
 
@@ -116,3 +130,26 @@ def visualize_model(model, dataloader, class_names, num_images=4, device='cpu'):
                 ax.set_title('predicted: {}'.format(class_names[preds[j]]))
             imshow(inputs.cpu().data[j])
             break
+
+def create_out_dir(parent_out_dir: str) -> str:
+    """
+    Creates the output directory in the given parent output directory,
+    which will be named by the current date and time.
+    """
+    datetime_string = datetime.datetime.now().strftime(DATETIME_STRING_FORMAT)
+    out_dir = os.path.join(parent_out_dir, datetime_string)
+    os.mkdir(out_dir)
+
+    return out_dir
+
+
+def configure_logger(out_dir: str):
+    """
+    Configure the logger:
+    (1) Remove the default logger (to stdout) and use a one with a custom format.
+    (2) Adds a log file named `run.log` in the given output directory.
+    """
+    logger.remove()
+    logger.remove()
+    logger.add(sink=sys.stdout, format=LOGGER_FORMAT)
+    logger.add(sink=os.path.join(out_dir, 'run.log'), format=LOGGER_FORMAT)
