@@ -1,5 +1,64 @@
 # Thesis
 
+## Getting Started
+
+### Creating The Environment
+
+We use [conda](https://docs.conda.io/en/latest/) for creating the environments.  
+
+PyTorch version is  1.7.1 
+### wandb
+
+We use [wandb](wandb.ai) for visualizing the experiments. For setting everything up, this section needs to be performed (once, like building the enviroment). 
+
+ 
+[login](https://app.wandb.ai/login) online to wandb. I used the option of *login with Google* and my user is [danielafrimi](https://wandb.ai/danielafrimi).
+
+Then, in the environment containing wandb, run `wandb login`.
+
+### Clone The Repo
+
+```shell
+git clone git@github.com:AlonNT/Thesis.git <REPO-PATH>
+```
+
+### Running The Experiments
+
+#### Prerequisites
+
+SSH to the machine on which you want to run the experiment. Then, cd into the repository directory
+```shell
+cd <REPO-PATH>
+```
+
+Activate the relevant environment you created previously (depending on which GPU you are using), e.g.
+```shell
+conda activate thesis_env
+```
+
+The package wandb needs to write some files during running, and by default it writes it to `~/.config/wandb`. While training on a remote machine this path might be in accessible for writing, so we need to change it by running:
+```shell
+export WANDB_CONFIG_DIR=/PATH/ACCESSIBLE/FROM/REMOTE/MACHINE/.config/wandb/
+```
+
+Now run the experiment you want. Each run will log to wandb, as well as to a local log-file (in some predefined directory which defaults to `./experiments`).
+
+#### Example Command-lines
+
+See help for the different possible arguments
+```shell
+python main.py --help
+```
+
+Run an experiment with the default arguments:
+```shell
+python main.py
+```
+
+Run on a GPU, giving a device argument (use different i's for running on different GPUs in the same machine):
+```shell
+python main.py --device cuda:0
+```
 
 ### Experiments
 1. train a simple net (3 blocks like resnet), on cifar10 with accuracy of 86%. 
