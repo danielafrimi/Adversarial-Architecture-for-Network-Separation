@@ -29,7 +29,7 @@ def get_image_transforms():
     return transform_with_aug, transform_no_aug
 
 
-def extract_specific_classes_cifar10(class_1='cat', class_2='dog'):
+def extract_subclasses_cifar10(class_1='cat', class_2='dog'):
     # Transforms object for trainset with augmentation
     transform_with_aug, transform_no_aug = get_image_transforms()
 
@@ -58,7 +58,7 @@ def extract_specific_classes_cifar10(class_1='cat', class_2='dog'):
     return cat_dog_trainset, cat_dog_testset
 
 def get_trainloader_subclasses_cifar10(config):
-    cat_dog_trainset, cat_dog_testset = extract_specific_classes_cifar10()
+    cat_dog_trainset, cat_dog_testset = extract_subclasses_cifar10()
     # Create datasetLoaders from trainset and testset
     trainsetLoader = DataLoader(cat_dog_trainset, batch_size=config.batch_size, shuffle=True)
     testsetLoader = DataLoader(cat_dog_testset, batch_size=config.batch_size, shuffle=False)
@@ -67,7 +67,6 @@ def get_trainloader_subclasses_cifar10(config):
 
 
 def get_trainloader_all_cifar10():
-    # todo this is on the whole dataset
     transform_with_aug, transform_no_aug = get_image_transforms()
     trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
                                             download=False, transform=transform_with_aug)
@@ -131,6 +130,44 @@ def visualize_model(model, dataloader, class_names, num_images=4, device='cpu'):
             imshow(inputs.cpu().data[j])
             break
 
+
+def normalize_output(self, img):
+    img = img - img.min()
+    img = img / img.max()
+    return img
+
+def visualize_feature_map(self, images, output, layer='conv1'):
+
+    # Plot some images
+    idx = torch.randint(0, output.size(0), ())
+    img = images[idx, 0]
+
+    fig, axarr = plt.subplots(1, 2)
+    axarr[0].imshow(img.detach().numpy())
+
+    # Visualize feature maps
+    activation = {}
+
+    def get_activation(name):
+        def hook(model, input, output):
+            activation[name] = output.detach()
+
+        return hook
+
+    self.classifier1.conv1.register_forward_hook(get_activation(layer))
+    data, _ = next(iter(self.testloader))
+    # data.unsqueeze_(0)
+
+    output = self.classifier1(data)
+
+    act = activation[layer].squeeze()
+
+    fig, axarr = plt.subplots(act.size(0))
+    for idx in range(min(4, act.size(0))):
+        axarr[idx].imshow(act[idx])
+        plt.show()
+
+
 def create_out_dir(parent_out_dir: str) -> str:
     """
     Creates the output directory in the given parent output directory,
@@ -153,3 +190,4 @@ def configure_logger(out_dir: str):
     logger.remove()
     logger.add(sink=sys.stdout, format=LOGGER_FORMAT)
     logger.add(sink=os.path.join(out_dir, 'run.log'), format=LOGGER_FORMAT)
+

@@ -1,23 +1,14 @@
 import argparse
 
-import matplotlib.pyplot as plt
-import torch
-import torch.nn as nn
 import torch.optim as optim
-import torchvision
 import wandb
 from loguru import logger
-from torch.utils.data import DataLoader
-from torchvision import transforms
 
-from models.classifier import Net
+from models.cnn_model import CNN_Model
 from models.disciminator import SiameseDiscriminator
 from models.resnet import ResNet18
-from models.cnn_model import CNN_Model
 from train import Trainer
 from utils import get_trainloader_subclasses_cifar10
-print(torch.__version__)
-plt.ion()  # interactive mode
 
 
 def parse_args():
@@ -26,18 +17,20 @@ def parse_args():
                     'This enables running the different experiments while logging to a log-file and to wandb.',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    # Arguments defining the model.
+    parser.add_argument("--experiment_type", type=str, default='all', choices=['all', 'only_classifiers'], help=f'')
+
+# Arguments defining the model.
     parser.add_argument('--num_models', type=int, default=2, help=f'The number of classifier to train in one train')
     parser.add_argument('--model', type=str, default='basic_cnn',
                         choices=['basic_cnn', 'resnet'], help=f'The model name for the network architecture')
 
     # Arguments defining the training-process
-    parser.add_argument('--batch_size', type=int, default=128,help=f'Batch size')
-    parser.add_argument('--epochs', type=int, default=1500, help=f'Number of epochs')
+    parser.add_argument('--batch_size', type=int, default=256,help=f'Batch size')
+    parser.add_argument('--epochs', type=int, default=80, help=f'Number of epochs')
     parser.add_argument('--learning_rate_classifiers', type=float, default=0.001, help=f'Learning-rate of classifier')
     parser.add_argument('--learning_rate_discriminator', type=float, default=0.0002, help=f'Learning-rate of discriminator')
     parser.add_argument('--weight_decay', type=float, default=5e-4, help=f'Weight decay_classifiers')
-    parser.add_argument('--cross_entropy_loss_weight', type=float, default=0.7, help=f'scalar (between 0-1), that indicates how much weight to give to cross_entropy_loss '
+    parser.add_argument('--cross_entropy_loss_weight', type=float, default=0.6, help=f'scalar (between 0-1), that indicates how much weight to give to cross_entropy_loss '
                                                                                      f'(discrimniator loss weight is 1 - cross_entropy_loss_weight')
 
     # Arguments for logging the training process.
@@ -51,15 +44,10 @@ def parse_args():
 
 
 def get_classifier_model(args):
-    """
-
-    :param args:
-    :return:
-    """
     models = dict()
 
     for i in range(args.num_models):
-        model = ResNet18() if args.model == 'resnet' else CNN_Model()
+        model = ResNet18() if args.model == 'resnet' else CNN_Model(num_classes=2)
         optimizer = optim.SGD(model.parameters(), lr=args.learning_rate_classifiers,
                           momentum=0.9, weight_decay=args.weight_decay)
 
@@ -81,10 +69,11 @@ def model_pipeline(hyperparameters):
         args = wandb.config
 
         logger.info(f'Starting to train {args.model} '
+                    f'Experiment type is {args.experiment_type} '
                     f'for {args.epochs} epochs '
-                    f'opt={args.optimizer_type}, '
+                    f'cross_entropy_loss_weight is {args.cross_entropy_loss_weight} '
                     f'bs={args.batch_size}, '
-                    f'lr_classifier={args.learning_rate_classifier1}, '
+                    f'lr_classifier={args.learning_rate_classifiers}, '
                     f'lr_D={args.learning_rate_discriminator}, '
                     f'wd={args.weight_decay}')
 
@@ -95,29 +84,14 @@ def model_pipeline(hyperparameters):
 
         discriminator, optimizerD = get_discriminator(args)
 
-        trainer = Trainer(trainsetLoader, testsetLoader, [models[0], models[1]], discriminator)
-        trainer.train_model(optimizers=[models.get(0), models.get(1)], optimizerD=optimizerD, num_epochs=args.epochs)
-
-        trainer.validation()
+        trainer = Trainer(trainloader=trainsetLoader, testloader=testsetLoader,
+                          models=list(models.keys()), discriminator=discriminator, cross_entropy_loss_weight=args.cross_entropy_loss_weight)
+        trainer.train_model(optimizers=list(models.values()), optimizerD=optimizerD, num_epochs=args.epochs, use_discriminator=args.experiment_type == 'all' )
 
 
 @logger.catch
 def main():
     args = parse_args()
-    # wandb.login()
-
-    # config = dict(
-    #     num_models=args.num_models,
-    #     model=args.model,
-    #     epochs=args.epochs,
-    #     batch_size=args.batch_size,
-    #     learning_rate_classifier1=args.learning_rate_classifiers,
-    #     learning_rate_classifier2=args.learning_rate_classifiers,
-    #     learning_rate_discriminator=args.learning_rate_discriminator,
-    #     weight_decay=args.weight_decay,
-    #     cross_entropy_loss_weight=args.cross_entropy_loss_weight,
-    #     path=args.path,
-    #     log_interval=args.log_interval)
 
     model_pipeline(hyperparameters=args)
 

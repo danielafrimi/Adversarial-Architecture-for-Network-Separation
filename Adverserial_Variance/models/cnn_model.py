@@ -1,9 +1,8 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 class CNN_Model(nn.Module):
-    def __init__(self):
+    def __init__(self, num_classes):
         """CNN Builder."""
         super(CNN_Model, self).__init__()
 
@@ -35,6 +34,7 @@ class CNN_Model(nn.Module):
             nn.MaxPool2d(kernel_size=2, stride=2),
         )
 
+
         self.fc_layer = nn.Sequential(
             nn.Dropout(p=0.1),
             nn.Linear(4096, 1024),
@@ -42,8 +42,9 @@ class CNN_Model(nn.Module):
             nn.Linear(1024, 512),
             nn.ReLU(inplace=True),
             nn.Dropout(p=0.1),
-            nn.Linear(512, 10)
+            nn.Linear(512, num_classes)
         )
+
 
     def forward(self, x):
         """Perform forward."""
