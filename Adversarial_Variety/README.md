@@ -1,5 +1,14 @@
 # Thesis
 
+## Introduction
+Adversarial Architecture for Network Separation
+
+implementing adversarial architecture to push two networks apart, in order to increase network variance.
+
+<p align="center">
+<img src="images/adversarial%20variety.png" alt="Example Architecture" width="50%"/>
+</p>
+
 ## Getting Started
 
 ### Creating The Environment
@@ -19,7 +28,7 @@ Then, in the environment containing wandb, run `wandb login`.
 ### Clone The Repo
 
 ```shell
-git clone git@github.com:AlonNT/Thesis.git <REPO-PATH>
+git clone git@github.com:danielafrimi/Thesis.git <REPO-PATH>
 ```
 
 ### Running The Experiments
@@ -74,11 +83,12 @@ after this, I trained the model only on 2 classes from the dataset (cat, dog - 5
    and batch normalization layers to meet this criteria.  
    
 #### TODO
-1. Implement TPR for each sample (Let's agree to agree).
+1. Implement TP-agreement (for each sample, check how any models is right, divide it by the number of models) for each sample (Let's agree to agree).
 2. Take 6 Basic models (without adversarial method) and 3 (pairs) models that training with our method.
-and calculate the TPR for each sample (and checks if the accuracy remains + more diversity).
+and calculate the TP-agreement for each sample (and checks if the accuracy remains + more diversity).
 3. Get a test set for Discriminator (thought to take a latents codes with its labels, in the end of the classifier train).
 4. play with the weight of each loss. 
+5. check D result (during the last epochs check if D succeed to identify representation from the same class).
 
 ### Related Papers & Subjects
 
