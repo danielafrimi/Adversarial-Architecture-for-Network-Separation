@@ -95,6 +95,7 @@ weight of 0.8, and the other two, don't get satisfied results.
   <img src="images/weight_ce_loss/Section-1-Panel-4-7zonhdu0e.png" width="250"/>
   <img src="images/weight_ce_loss/Section-1-Panel-5-leuk996bi.png" width="250"/>
 </p>
+
 #### TODO
 1. Implement TP-agreement (for each sample, check how any models is right, divide it by the number of models) for each sample (Let's agree to agree).
 2. Take 6 Basic models (without adversarial method) and 3 (pairs) models that training with our method.
