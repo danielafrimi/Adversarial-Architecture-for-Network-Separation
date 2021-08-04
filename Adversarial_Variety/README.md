@@ -82,6 +82,11 @@ after this, I trained the model only on 2 classes from the dataset (cat, dog - 5
    The weights_init function takes an initialized model as input and reinitializes all convolutional, convolutional-transpose, 
    and batch normalization layers to meet this criteria.
    
+#### Different weights for Cross-Entropy Loss
+In order to train our network, the classifiers have 2 losses - Cross-Entropy and Discriminator loss (model separation).
+The network train on different weight for each loss. In the graphs we can see that the model gets accuracy of ~70% with 
+weight of 0.8, and the other two, don't get satisfied results.
+
 <p float="center">
   <img src="images/weight_ce_loss/Section-1-Panel-0-jw9bd3npy.png" width="250" />
   <img src="images/weight_ce_loss/Section-1-Panel-1-71437zakn.png" width="250" /> 
