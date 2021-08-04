@@ -80,8 +80,13 @@ after this, I trained the model only on 2 classes from the dataset (cat, dog - 5
    ** According to daphna we shpuld not use assumption from GAN's training, because this task is different. therefore, check if the previous architecture network.
 3. From the DCGAN paper, the authors specify that all model weights shall be randomly initialized from a Normal distribution with mean=0, stdev=0.02. 
    The weights_init function takes an initialized model as input and reinitializes all convolutional, convolutional-transpose, 
-   and batch normalization layers to meet this criteria.  
+   and batch normalization layers to meet this criteria.
    
+<p float="left">
+  <img src="images/weight_ce_loss/Section-1-Panel-0-jw9bd3npy.png" width="80" />
+  <img src="images/weight_ce_loss/Section-1-Panel-1-71437zakn.png" width="100" /> 
+  <img src="images/weight_ce_loss/Section-1-Panel-2-9mb6v1lp7.png" width="100" />
+</p>
 #### TODO
 1. Implement TP-agreement (for each sample, check how any models is right, divide it by the number of models) for each sample (Let's agree to agree).
 2. Take 6 Basic models (without adversarial method) and 3 (pairs) models that training with our method.
