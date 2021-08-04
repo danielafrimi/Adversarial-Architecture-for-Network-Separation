@@ -83,12 +83,12 @@ after this, I trained the model only on 2 classes from the dataset (cat, dog - 5
    and batch normalization layers to meet this criteria.
    
 <p float="center">
-  <img src="images/weight_ce_loss/Section-1-Panel-0-jw9bd3npy.png" width="200" />
-  <img src="images/weight_ce_loss/Section-1-Panel-1-71437zakn.png" width="200" /> 
-  <img src="images/weight_ce_loss/Section-1-Panel-2-9mb6v1lp7.png" width="200"/>
-  <img src="images/weight_ce_loss/Section-1-Panel-3-6dk8nu2f0.png" width="200"/>
-  <img src="images/weight_ce_loss/Section-1-Panel-4-7zonhdu0e.png" width="200"/>
-  <img src="images/weight_ce_loss/Section-1-Panel-5-leuk996bi.png" width="200"/>
+  <img src="images/weight_ce_loss/Section-1-Panel-0-jw9bd3npy.png" width="250" />
+  <img src="images/weight_ce_loss/Section-1-Panel-1-71437zakn.png" width="250" /> 
+  <img src="images/weight_ce_loss/Section-1-Panel-2-9mb6v1lp7.png" width="250"/>
+  <img src="images/weight_ce_loss/Section-1-Panel-3-6dk8nu2f0.png" width="250"/>
+  <img src="images/weight_ce_loss/Section-1-Panel-4-7zonhdu0e.png" width="250"/>
+  <img src="images/weight_ce_loss/Section-1-Panel-5-leuk996bi.png" width="250"/>
 </p>
 #### TODO
 1. Implement TP-agreement (for each sample, check how any models is right, divide it by the number of models) for each sample (Let's agree to agree).
