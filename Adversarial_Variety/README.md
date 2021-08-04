@@ -83,7 +83,7 @@ after this, I trained the model only on 2 classes from the dataset (cat, dog - 5
    and batch normalization layers to meet this criteria.
    
 <p float="left">
-  <img src="images/weight_ce_loss/Section-1-Panel-0-jw9bd3npy.png" width="80" />
+  <img src="images/weight_ce_loss/Section-1-Panel-0-jw9bd3npy.png" width="100" />
   <img src="images/weight_ce_loss/Section-1-Panel-1-71437zakn.png" width="100" /> 
   <img src="images/weight_ce_loss/Section-1-Panel-2-9mb6v1lp7.png" width="100" />
 </p>
