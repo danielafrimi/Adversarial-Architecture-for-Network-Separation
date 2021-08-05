@@ -14,6 +14,7 @@ from torchvision.datasets import CIFAR10
 from datasetMaker import DatasetMaker, get_class_i
 from consts import LOGGER_FORMAT, DATETIME_STRING_FORMAT
 
+
 def get_image_transforms():
     RC = transforms.RandomCrop(32, padding=4)
     RHF = transforms.RandomHorizontalFlip()
@@ -22,7 +23,7 @@ def get_image_transforms():
     TPIL = transforms.ToPILImage()
 
     # Transforms object for trainset with augmentation
-    transform_with_aug = transforms.Compose([TPIL,RC, RHF, TT, NRM])
+    transform_with_aug = transforms.Compose([TPIL, RC, RHF, TT, NRM])
     # Transforms object for testset with NO augmentation
     transform_no_aug = transforms.Compose([TT, NRM])
 
@@ -57,13 +58,13 @@ def extract_subclasses_cifar10(class_1='cat', class_2='dog'):
 
     return cat_dog_trainset, cat_dog_testset
 
+
 def get_trainloader_subclasses_cifar10(config):
     cat_dog_trainset, cat_dog_testset = extract_subclasses_cifar10()
     # Create datasetLoaders from trainset and testset
     trainsetLoader = DataLoader(cat_dog_trainset, batch_size=config.batch_size, shuffle=True)
     testsetLoader = DataLoader(cat_dog_testset, batch_size=config.batch_size, shuffle=False)
     return trainsetLoader, testsetLoader
-
 
 
 def get_trainloader_all_cifar10():
@@ -136,8 +137,8 @@ def normalize_output(self, img):
     img = img / img.max()
     return img
 
-def visualize_feature_map(self, images, output, layer='conv1'):
 
+def visualize_feature_map(self, images, output, layer='conv1'):
     # Plot some images
     idx = torch.randint(0, output.size(0), ())
     img = images[idx, 0]
@@ -167,6 +168,40 @@ def visualize_feature_map(self, images, output, layer='conv1'):
         axarr[idx].imshow(act[idx])
         plt.show()
 
+@torch.no_grad()
+def calculate_tp_agreement(models_list, testloader, device):
+    """
+    metric that calculate for each sample, how many models answer right about it (they agree),
+    divide it by the number of models. Unlike precision, TP agreement measures the average accuracy of a single example
+    over multiple models, as opposed to precision which measures the average accuracy of a single model over multiple examples
+    :return: float between 0-1
+    """
+
+    correct = 0
+    total = 0
+
+    for data in testloader:
+
+        for id, model in enumerate(models_list):
+
+            images, labels = data[0].to(device), data[1].to(device)
+            # calculate outputs by running images through the network
+            outputs, f = model(images)
+            # the class with the highest energy is what we choose as prediction
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+
+        # the class with the highest energy is what we choose as prediction
+        _, predicted = torch.max(ensemble_output.data, 1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+
+    print("Accuracy of Ensemble {} Models".format(2), (100 * correct / total))
+    wandb.log({"Accuracy of Ensemble {} Models".format(2): (100 * correct / total), }
+              , step=num_iter)
+
 
 def create_out_dir(parent_out_dir: str) -> str:
     """
@@ -190,4 +225,3 @@ def configure_logger(out_dir: str):
     logger.remove()
     logger.add(sink=sys.stdout, format=LOGGER_FORMAT)
     logger.add(sink=os.path.join(out_dir, 'run.log'), format=LOGGER_FORMAT)
-

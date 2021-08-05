@@ -8,7 +8,7 @@ from models.disciminator import SiameseDiscriminator
 
 from torch.utils.data import DataLoader
 
-from utils import extract_images_to_dataset, imshow, imshow_img, visualize_model
+
 from models.cnn_model import CNN_Model
 
 print(torch.__version__)
@@ -17,12 +17,12 @@ same_class_label = 1.
 different_class_label = 0.
 
 hyperparameters = dict(
-    epochs=40,
-    batch_size=128,
-    cross_entropy_loss_weight=0.6,
-    disc_loss_weight=0.4,
-    learning_rate_classifier1=0.01,
-    learning_rate_classifier2=0.01,
+    epochs=80,
+    batch_size=256,
+    cross_entropy_loss_weight=0.8,
+    disc_loss_weight=0.2,
+    learning_rate_classifier1=0.001,
+    learning_rate_classifier2=0.001,
     dataset="cifar10",
     num_classes=2)
 
@@ -65,7 +65,7 @@ def main():
         classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
         classes_binary = ('cat', 'dog')
 
-        cat_dog_trainset, cat_dog_testset = extract_images_to_dataset()
+        cat_dog_trainset, cat_dog_testset = extract_specific_classes_cifar10()
 
         # Create datasetLoaders from trainset and testset
         trainsetLoader = DataLoader(cat_dog_trainset, batch_size=config.batch_size, shuffle=True)
@@ -123,7 +123,7 @@ def main():
             running_loss_d = 0.0
             for i, data in enumerate(trainsetLoader, 0):
                 num_iter += 1
-                wandb.log({"i": i, } ,step=num_iter)
+
                 # Split the data into 2 batches. one batch for each model
                 images_1, images_2 = torch.split(data[0], data[0].shape[0] // 2, dim=0)
                 targets_1, targets_2 = torch.split(data[1], data[1].shape[0] // 2, dim=0)
@@ -137,9 +137,9 @@ def main():
                 labels_classifiers = torch.from_numpy(same_different_class_labels_numpy).type(torch.FloatTensor)
                 labels_classifiers = torch.unsqueeze(labels_classifiers, dim=1).to(device)
                 same_different_class_labels_numpy = (same_different_class_labels_numpy < 1)
-                same_different_class_labels_tensor = torch.from_numpy(same_different_class_labels_numpy)
-                same_different_class_labels_tensor = same_different_class_labels_tensor.type(torch.FloatTensor)
-                same_different_class_labels_tensor = torch.unsqueeze(same_different_class_labels_tensor, dim=1).to(
+                discriminator_labels = torch.from_numpy(same_different_class_labels_numpy)
+                discriminator_labels = discriminator_labels.type(torch.FloatTensor)
+                discriminator_labels = torch.unsqueeze(discriminator_labels, dim=1).to(
                     device)
 
                 # zero the parameter gradients
@@ -152,9 +152,9 @@ def main():
                 outputs, feature_map = net(images_1)
                 outputs2, feature_map2 = net2(images_2)
 
-                same_different_class_output = discriminator(feature_map, feature_map2)
-                loss_discriminator = criterionD(same_different_class_output,
-                                                same_different_class_labels_tensor)
+                discriminator_output = discriminator(feature_map, feature_map2)
+                loss_discriminator = criterionD(discriminator_output,
+                                                discriminator_labels)
 
                 loss_discriminator.backward(retain_graph=True)
 
@@ -162,11 +162,11 @@ def main():
                 b_size = images_1.size(0)
                 label_classifier_D = torch.full((b_size,), different_class_label, dtype=torch.float, device=device)
                 a = config.cross_entropy_loss_weight * criterion(outputs, targets_1)
-                b =config.disc_loss_weight * criterionD(same_different_class_output, labels_classifiers)
+                b = config.disc_loss_weight * criterionD(discriminator_output, label_classifier_D)
                 loss = a + b
 
                 loss2 = config.cross_entropy_loss_weight * criterion2(outputs2, targets_2) + \
-                        config.disc_loss_weight * criterionD(same_different_class_output, labels_classifiers)
+                        config.disc_loss_weight * criterionD(discriminator_output, label_classifier_D)
 
                 loss.backward(retain_graph=True)
                 loss2.backward(retain_graph=True)
@@ -180,7 +180,7 @@ def main():
                 running_loss_2 += loss2.item()
                 running_loss_d += loss_discriminator.item()
 
-                if i % 70 == 69:  # print every 2000 mini-batches
+                if i % 20 == 19:  # print every 2000 mini-batches
                     print('[%d, %5d] loss: %.3f' % (epoch + 1, i + 1, running_loss / 70))
                     wandb.log({"running loss classifier_1": running_loss / 70, }
                               , step=num_iter)
@@ -217,7 +217,7 @@ def validation(net, net2, testsetLoader, device, classes_binary, classes, num_it
                 correct += (predicted == labels).sum().item()
 
             print('Accuracy of the network on test images: %d %%' % (100 * correct / total))
-            wandb.log({"acc {}".format(id): (100 * correct / total), }
+            wandb.log({"Accuracy Model {}".format(id + 1): (100 * correct / total), }
                       , step=num_iter)
 
     # prepare to count predictions for each class

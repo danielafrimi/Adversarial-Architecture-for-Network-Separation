@@ -17,30 +17,32 @@ def parse_args():
                     'This enables running the different experiments while logging to a log-file and to wandb.',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("--experiment_type", type=str, default='all', choices=['all', 'only_classifiers'], help=f'')
+    parser.add_argument("--experiment_type", type=str, default='only_classifiers', choices=['all', 'only_classifiers'],
+                        help=f'')
 
-# Arguments defining the model.
+    # Arguments defining the model.
     parser.add_argument('--num_models', type=int, default=2, help=f'The number of classifier to train in one train')
     parser.add_argument('--model', type=str, default='basic_cnn',
                         choices=['basic_cnn', 'resnet'], help=f'The model name for the network architecture')
 
     # Arguments defining the training-process
-    parser.add_argument('--batch_size', type=int, default=256,help=f'Batch size')
-    parser.add_argument('--epochs', type=int, default=80, help=f'Number of epochs')
+    parser.add_argument('--batch_size', type=int, default=256, help=f'Batch size')
+    parser.add_argument('--epochs', type=int, default=300, help=f'Number of epochs')
     parser.add_argument('--learning_rate_classifiers', type=float, default=0.001, help=f'Learning-rate of classifier')
-    parser.add_argument('--learning_rate_discriminator', type=float, default=0.0002, help=f'Learning-rate of discriminator')
+    parser.add_argument('--learning_rate_discriminator', type=float, default=0.001,
+                        help=f'Learning-rate of discriminator')
     parser.add_argument('--weight_decay', type=float, default=5e-4, help=f'Weight decay_classifiers')
-    parser.add_argument('--cross_entropy_loss_weight', type=float, default=0.6, help=f'scalar (between 0-1), that indicates how much weight to give to cross_entropy_loss '
-                                                                                     f'(discrimniator loss weight is 1 - cross_entropy_loss_weight')
+    parser.add_argument('--cross_entropy_loss_weight', type=float, default=0.8,
+                        help=f'scalar (between 0-1), that indicates how much weight to give to cross_entropy_loss '
+                             f'(discrimniator loss weight is 1 - cross_entropy_loss_weight')
 
     # Arguments for logging the training process.
     parser.add_argument('--path', type=str, default='./experiments', help=f'Output path for the experiment - '
-                             f'a sub-directory named with the data and time will be created within')
+                                                                          f'a sub-directory named with the data and time will be created within')
     parser.add_argument('--log_interval', type=int, default=100,
                         help=f'How many iterations between each training log')
 
     return parser.parse_args()
-
 
 
 def get_classifier_model(args):
@@ -49,7 +51,7 @@ def get_classifier_model(args):
     for i in range(args.num_models):
         model = ResNet18() if args.model == 'resnet' else CNN_Model(num_classes=2)
         optimizer = optim.SGD(model.parameters(), lr=args.learning_rate_classifiers,
-                          momentum=0.9, weight_decay=args.weight_decay)
+                              momentum=0.9, weight_decay=args.weight_decay)
 
         models[model] = optimizer
 
@@ -79,14 +81,15 @@ def model_pipeline(hyperparameters):
 
         trainsetLoader, testsetLoader = get_trainloader_subclasses_cifar10(args)
 
-
         models = get_classifier_model(args)
 
         discriminator, optimizerD = get_discriminator(args)
 
         trainer = Trainer(trainloader=trainsetLoader, testloader=testsetLoader,
-                          models=list(models.keys()), discriminator=discriminator, cross_entropy_loss_weight=args.cross_entropy_loss_weight)
-        trainer.train_model(optimizers=list(models.values()), optimizerD=optimizerD, num_epochs=args.epochs, use_discriminator=args.experiment_type == 'all' )
+                          models=list(models.keys()), discriminator=discriminator,
+                          cross_entropy_loss_weight=args.cross_entropy_loss_weight)
+        trainer.train_model(optimizers=list(models.values()), optimizerD=optimizerD, num_epochs=args.epochs,
+                            use_discriminator=args.experiment_type == 'all')
 
 
 @logger.catch
