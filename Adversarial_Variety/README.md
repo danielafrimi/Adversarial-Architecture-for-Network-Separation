@@ -1,4 +1,4 @@
-# Thesis
+# Adversarial Architecture for Network Separation
 
 ## Introduction
 Adversarial Architecture for Network Separation
