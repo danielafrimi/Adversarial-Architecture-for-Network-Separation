@@ -100,7 +100,6 @@ weight of 0.8, and the other two, don't get satisfied results.
 1. Implement TP-agreement (for each sample, check how any models is right, divide it by the number of models) for each sample (Let's agree to agree).
 2. Take 6 Basic models (without adversarial method) and 3 (pairs) models that training with our method.
 and calculate the TP-agreement for each sample (and checks if the accuracy remains + more diversity).
-3. Get a test set for Discriminator (thought to take a latents codes with its labels, in the end of the classifier train).
 4. play with the weight of each loss. 
 5. check D result (during the last epochs check if D succeed to identify representation from the same class).
 

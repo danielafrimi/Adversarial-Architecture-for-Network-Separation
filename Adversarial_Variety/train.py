@@ -8,6 +8,7 @@ from consts import CLASSES_BINARY
 
 different_class_label = 0.
 
+
 class Trainer:
     def __init__(self, trainloader, testloader, models, discriminator, cross_entropy_loss_weight):
         self.trainloader = trainloader
@@ -19,17 +20,19 @@ class Trainer:
 
     def train_model(self, optimizers, optimizerD, use_discriminator, num_epochs=80):
 
+        global discriminator_labels
         criterionD = nn.BCELoss().to(self.device)
         criterion_classifiers = nn.CrossEntropyLoss().to(self.device)
         optimizer1, optimizer2 = optimizers[0], optimizers[1]
 
         # for visualizing the weights updates and log in wandb server
-        for model, criterion in [(self.classifier1,criterion_classifiers),
-                      (self.classifier2, criterion_classifiers), (self.discriminator, criterionD)]:
+        for model, criterion in [(self.classifier1, criterion_classifiers),
+                                 (self.classifier2, criterion_classifiers), (self.discriminator, criterionD)]:
             wandb.watch(model, criterion, log="all", log_freq=5)
 
+        disc_table = wandb.Table(columns=["epoch", "Labels", "D Prediction"])
 
-        print('Start Training')
+        logger.info('Start Training')
         num_iter = 0
 
         # Run models to GPU
@@ -42,7 +45,8 @@ class Trainer:
         for epoch in range(num_epochs):
 
             running_loss_1, running_loss_2, running_loss_d = 0.0, 0.0, 0.0
-
+            wandb.log({"epoch": epoch}, step=num_iter)
+            start_epoch = True
             for batch_idx, (images, targets) in enumerate(self.trainloader, 0):
                 num_iter += 1
 
@@ -54,18 +58,17 @@ class Trainer:
                 images_1, images_2, targets_1, targets_2 = images_1.to(self.device), images_2.to(self.device), \
                                                            targets_1.to(self.device), targets_2.to(self.device)
 
-                discriminator_labels = self.get_discriminator_labels(targets_1, targets_2)
-
                 # zero the parameter gradients
                 optimizer1.zero_grad()
                 optimizer2.zero_grad()
                 optimizerD.zero_grad()
 
                 # forward + backward + optimize
-                # todo feature map is a tensor of shape torch.Size([32, 4096]), 32 is the batch size
                 outputs_1, feature_map = self.classifier1(images_1)
                 outputs_2, feature_map2 = self.classifier2(images_2)
+
                 if use_discriminator:
+                    discriminator_labels = self.get_discriminator_labels(targets_1, targets_2)
                     discriminator_output = self.discriminator(feature_map, feature_map2)
                     loss_discriminator = criterionD(discriminator_output, discriminator_labels)
 
@@ -73,16 +76,17 @@ class Trainer:
 
                 # The labels of the discriminator
                 batch_size = images_1.size(0)
-                label_classifier_D = torch.full((batch_size,), different_class_label, dtype=torch.float, device=self.device)
+                label_classifier_D = torch.unsqueeze(torch.full((batch_size,), different_class_label, dtype=torch.float,
+                                                                device=self.device), dim=1)
 
-                # a = self.cross_entropy_loss_weight * criterion(outputs_1, targets_1)
-                # b = (1.0 - self.cross_entropy_loss_weight) * criterionD(discriminator_output, label_classifier_D)
                 if use_discriminator:
-                    loss_1 = self.cross_entropy_loss_weight * criterion_classifiers(outputs_1, targets_1) +\
-                           (1.0 - self.cross_entropy_loss_weight) * criterionD(discriminator_output, label_classifier_D)
+                    loss_1 = self.cross_entropy_loss_weight * criterion_classifiers(outputs_1, targets_1) + \
+                             (1.0 - self.cross_entropy_loss_weight) * criterionD(discriminator_output,
+                                                                                 label_classifier_D)
 
                     loss_2 = self.cross_entropy_loss_weight * criterion_classifiers(outputs_2, targets_2) + \
-                            (1.0 - self.cross_entropy_loss_weight) * criterionD(discriminator_output, label_classifier_D)
+                             (1.0 - self.cross_entropy_loss_weight) * criterionD(discriminator_output,
+                                                                                 label_classifier_D)
                 else:
                     loss_1 = criterion_classifiers(outputs_1, targets_1)
                     loss_2 = criterion_classifiers(outputs_2, targets_2)
@@ -92,10 +96,10 @@ class Trainer:
 
                 if use_discriminator:
                     optimizerD.step()
+
                 optimizer1.step()
                 optimizer2.step()
 
-                # print statistics
                 running_loss_1 += loss_1.item()
                 running_loss_2 += loss_2.item()
                 if use_discriminator:
@@ -103,28 +107,46 @@ class Trainer:
 
                 if batch_idx % 20 == 19:
                     # Log statics
-                    for loss, model_name in [(running_loss_1, 'classifier_1'), (running_loss_2, 'classifier_2'), (running_loss_d, 'disc')]:
+                    for loss, model_name in [(running_loss_1, 'classifier_1'), (running_loss_2, 'classifier_2'),
+                                             (running_loss_d, 'disc')]:
                         wandb.log({"running loss {}".format(model_name): loss / 20, }, step=num_iter)
                         logger.info({"running loss {}".format(model_name): loss / 20})
 
+                    # if use_discriminator and start_epoch:
+                    #     # Add labels data and predictions to the W&B Table
+                    if use_discriminator:
+                        logger.info({"discriminator_labels": discriminator_labels, "discriminator_output": discriminator_output})
+                    #     for idx, im in enumerate(torch.squeeze(discriminator_labels)):
+                    #         disc_table.add_data(epoch, torch.squeeze(discriminator_labels)[idx],
+                    #                             torch.squeeze(discriminator_output)[idx])
+                    #
+                    logger.info("Epoch {}".format(epoch))
+                    #
+                        # wandb.log({"discrimnator_prediction": disc_table}, step=num_iter)
+                    #     start_epoch = False
 
                     running_loss_1, running_loss_2, running_loss_d = 0.0, 0.0, 0.0
 
             self.validation(num_iter)
             self.ensemble_models(num_iter)
 
-
-        print('Finished Training')
-        self.save_models()
+        logger.info('Finished Training')
+        self.save_models(adversiral_models=use_discriminator)
 
     def get_discriminator_labels(self, targets_1, targets_2):
+        """
+        Given the labels of each model, if the i'th label in targets_1 is come for the same class as
+        the i'th label in targets_2, we create label of 1.0 (same class gets label of 1, different classes get label of 0.)
+        :param targets_1: images labels for the 1st model
+        :param targets_2: images labels for the 2nd model
+        :return: Discriminator labels
+        """
         # Images of the same class gets the label 1, otherwise the label is 0
         same_different_class_labels_numpy = np.logical_xor(targets_1.cpu().numpy(),
                                                            targets_2.cpu().numpy()).astype(int)
         same_different_class_labels_numpy = (same_different_class_labels_numpy < 1)
 
-        discriminator_labels = torch.from_numpy(same_different_class_labels_numpy)
-        discriminator_labels = discriminator_labels.type(torch.FloatTensor)
+        discriminator_labels = torch.from_numpy(same_different_class_labels_numpy).type(torch.FloatTensor)
         discriminator_labels = torch.unsqueeze(discriminator_labels, dim=1).to(self.device)
 
         return discriminator_labels
@@ -150,6 +172,11 @@ class Trainer:
 
     @torch.no_grad()
     def ensemble_models(self, num_iter):
+        """
+
+        :param num_iter:
+        :return:
+        """
         correct = 0
         total = 0
 
@@ -178,10 +205,7 @@ class Trainer:
         wandb.log({"Accuracy of Ensemble {} Models".format(2): (100 * correct / total), }
                   , step=num_iter)
 
-
-    def save_models(self):
-        torch.save(self.classifier1.state_dict(), './cifar_net_1.pth')
-        torch.save(self.classifier2.state_dict(), './cifar_net_2.pth')
-        torch.save(self.discriminator.state_dict(), './cifar_net_d.pth')
-
-
+    def save_models(self, is_adversiral_models=False):
+        torch.save(self.classifier1.state_dict(), './models_weights/cifar_net_1_{}.pth'.format(is_adversiral_models))
+        torch.save(self.classifier2.state_dict(), './cifar_net_2_{}.pth'.format(is_adversiral_models))
+        torch.save(self.classifier1.state_dict(), './cifar_net_D_{}.pth'.format(is_adversiral_models))

@@ -4,12 +4,12 @@ import torchvision.transforms as transforms
 from models.resnet import ResNet18
 import wandb
 from loguru import logger
-from models.disciminator import SiameseDiscriminator
+from models.disciminator import CustomDiscriminator
 
 from torch.utils.data import DataLoader
 
 
-from models.cnn_model import CNN_Model
+from models.simple_resnet import Simple_Resnet
 
 print(torch.__version__)
 
@@ -94,9 +94,9 @@ def main():
         import torch.nn as nn
         import torch.nn.functional as F
 
-        net = CNN_Model()
-        net2 = CNN_Model()
-        discriminator = SiameseDiscriminator()
+        net = Simple_Resnet()
+        net2 = Simple_Resnet()
+        discriminator = CustomDiscriminator()
 
         import torch.optim as optim
 

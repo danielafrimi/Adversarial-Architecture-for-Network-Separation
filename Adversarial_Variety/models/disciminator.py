@@ -9,11 +9,67 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-
 class SiameseDiscriminator(nn.Module):
 
     def __init__(self):
         super(SiameseDiscriminator, self).__init__()
+
+        self.conv1 = nn.Conv2d(256, 64, 10)
+        self.conv2 = nn.Conv2d(64, 128, 7)
+        self.conv3 = nn.Conv2d(128, 128, 4)
+        self.conv4 = nn.Conv2d(128, 256, 4)
+
+        self.max_pooling = nn.MaxPool2d(2)
+
+        self.conv = nn.Sequential(
+            nn.Conv2d(3, 64, 10),  # 64@96*96
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(2),  # 64@48*48
+            nn.Conv2d(64, 128, 7),
+            nn.ReLU(),  # 128@42*42
+            nn.MaxPool2d(2),  # 128@21*21
+            nn.Conv2d(128, 128, 4),
+            nn.ReLU(),  # 128@18*18
+            nn.MaxPool2d(2),  # 128@9*9
+            nn.Conv2d(128, 256, 4),
+            nn.ReLU(),  # 256@6*6
+        )
+        self.liner = nn.Sequential(nn.Linear(9216, 4096), nn.Sigmoid())
+        self.out = nn.Linear(4096, 1)
+
+        # todo ?
+        self.apply(init_weights)
+
+    def forward_one(self, x):
+        x = F.relu(self.conv1(x))
+        x = self.max_pooling(x)
+
+        x = F.relu(self.conv2(x))
+        x = self.max_pooling(x)
+
+        x = F.relu(self.conv3(x))
+        x = self.max_pooling(x)
+
+        x = F.relu(self.conv4(x))
+
+        # x = self.conv(x)
+        x = x.view(x.size()[0], -1)
+        x = self.liner(x)
+        return x
+
+    def forward(self, x1, x2):
+        out1 = self.forward_one(x1)
+        out2 = self.forward_one(x2)
+        dis = torch.abs(out1 - out2)
+        out = self.out(dis)
+        #  return self.sigmoid(out)
+        return out
+
+
+class CustomDiscriminator(nn.Module):
+
+    def __init__(self):
+        super(CustomDiscriminator, self).__init__()
         # Size of feature maps in discriminator
         self.ndf = 64
 
